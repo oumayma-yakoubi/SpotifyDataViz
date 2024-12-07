@@ -16,7 +16,7 @@ Notre projet vise à répondre aux besoins d’analyse et de visualisation des c
 * **CSS** :(Cascading Style Sheets) permet de créer des pages web à l'apparence soignée.
 
 ## Document de cadrage : 
-Pour consulter le document de cadrage [cliquez ici](https://docs.google.com/document/d/1KhRriVV73ODVwSic-scuGZxSrzpAr3ZW2vI1jE3uIss/edit?usp=sharing)..
+Pour consulter le document de cadrage [cliquez ici...](https://docs.google.com/document/d/1KhRriVV73ODVwSic-scuGZxSrzpAr3ZW2vI1jE3uIss/edit?usp=sharing)
 
 
 
