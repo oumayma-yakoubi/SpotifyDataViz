@@ -15,6 +15,8 @@ Notre projet vise à répondre aux besoins d’analyse et de visualisation des c
 * **HTML** : Le HyperText Markup Language, généralement abrégé HTML ou, dans sa dernière version, HTML5, est le langage de balisage conçu pour écrire les pages web.
 * **CSS** :(Cascading Style Sheets) permet de créer des pages web à l'apparence soignée.
 
+## Document de cadrage : 
+Pour consulter le document de cadrage [cliquez ici](https://docs.google.com/document/d/1KhRriVV73ODVwSic-scuGZxSrzpAr3ZW2vI1jE3uIss/edit?usp=sharing)..
 
 
 
