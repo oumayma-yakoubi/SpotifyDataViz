@@ -6,7 +6,7 @@
       "StreamingHistory_music_0.json",
       "StreamingHistory_podcast_0.json",
       "Wrapped2023.json", 
-      "YourLibrary"
+      "YourLibrary.json"
 
     ],
     "user-2": [
@@ -18,7 +18,7 @@
       "StreamingHistory_music_1.json",
       "StreamingHistory_podcast_0.json",
       "Wrapped2023.json", 
-      "YourLibrary"
+      "YourLibrary.json"
     ],
     "user-3": [
       "Identity.json",
@@ -28,7 +28,7 @@
       "StreamingHistory_music_1.json",
       "StreamingHistory_podcast_0.json",
       "Wrapped2023.json", 
-      "YourLibrary"
+      "YourLibrary.json"
     ]
   }
   
