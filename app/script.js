@@ -5,12 +5,12 @@ async function loadJSON(filePath){
 }
 
 async function getUserFileList() {
-    const response = await fetch('D:\\Spotify_DataViz_Project\\index.json');
+    const response = await fetch('https://raw.githubusercontent.com/oumayma-yakoubi/SpotifyDataViz/refs/heads/main/index.json');
     return await response.json();
 }
 
 async function loadUserData(userFolder, files) {
-    const basePath = `data/${userFolder}`;
+    const basePath = `https://raw.githubusercontent.com/oumayma-yakoubi/SpotifyDataViz/refs/heads/main/data/${userFolder}`;
     const userData = {user: userFolder, playlists: [], streamingHistory: {music: [], podcast: []} };
     
     for (const file of files){

@@ -1,6 +1,6 @@
 {
     "user-1": [
-      "identity.json",
+      "Identity.json",
       "Playlist1.json",
       "SearchQueries.json",
       "StreamingHistory_music_0.json",
@@ -10,7 +10,7 @@
 
     ],
     "user-2": [
-      "identity.json",
+      "Identity.json",
       "Playlist1.json",
       "Playlist2.json",
       "SearchQueries.json",
@@ -21,7 +21,7 @@
       "YourLibrary"
     ],
     "user-3": [
-      "identity.json",
+      "Identity.json",
       "Playlist1.json",
       "SearchQueries.json",
       "StreamingHistory_music_0.json",
