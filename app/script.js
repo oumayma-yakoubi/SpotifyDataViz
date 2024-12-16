@@ -27,7 +27,7 @@ async function loadUserData(userFolder, files) {
         else if(file.startsWith('Playlist')){
             // Regroupement des playlists
             const playlistData = await loadJSON(`${basePath}/${file}`);
-            userData.playlists.push(playlistData);
+            userData.playlists.push(...playlistData.playlists);
         } else{
             const fileKey = file.replace('.json', '');
             userData[fileKey] = await loadJSON(`${basePath}/${file}`);
