@@ -62,10 +62,41 @@ async function loadAllUsersData() {
     
 }
 
+
+// // Extract the artist counts for a given user
+// async function getTopArtists(userFolder) {
+//     const basePath = `https://raw.githubusercontent.com/oumayma-yakoubi/SpotifyDataViz/refs/heads/main/data/${userFolder}`;
+//     const yourLibraryData = await loadJSON(`${basePath}/YourLibrary.json`);
+    
+//     const artistCount = {};
+
+//     yourLibraryData.tracks.forEach(track => {
+//         const artist = track.artist;
+//         if (artist in artistCount) {
+//             artistCount[artist] += 1;
+//         } else {
+//             artistCount[artist] = 1;
+//         }
+//     });
+
+//     // Sort by the number of tracks (descending order) and take the top 10
+//     const sortedArtists = Object.entries(artistCount)
+//         .sort((a, b) => b[1] - a[1])
+//         .slice(0, 10);
+
+//     return sortedArtists.map(([artist, count]) => ({ name: artist, value: count }));
+// }
+
+// // Step 1: Initialize the data and plot the treemap for a given user
+// async function plotTopArtistsTreemap(userFolder) {
+//     const topArtists = await getTopArtists(userFolder);
+//     drawTreemap(topArtists);
+// }
+
+
+
 async function init() {
     const allData = await loadAllUsersData();
     console.log("Données consolidées: ", allData);
-
-
 }
 init();
