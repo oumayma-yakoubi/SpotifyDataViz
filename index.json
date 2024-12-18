@@ -29,6 +29,9 @@
       "StreamingHistory_podcast_0.json",
       "Wrapped2023.json", 
       "YourLibrary.json"
+    ],
+    "user-fake":[
+      "StreamingHistory_music_0.json"
     ]
   }
   
