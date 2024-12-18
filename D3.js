@@ -8,22 +8,29 @@ async function populateUserSelect(){
         option.textContent = user.user;
         userSelect.appendChild(option);
     });
-
 }
 
 async function onUserSelect(event) {
     const allData = await loadAllUsersData();
     const selectedIndex = event.target.value;
 
-    if (selectedIndex !== ""){
-        const user = allData[selectedIndex]; // Obtenir les données de l'utilisateur
-        await visualizePlaylists(user);
-    }
-    else{
-        document.getElementById("playlist-chart").innerHTML = "";
-    }
+    // Clear all visualizations
+    document.getElementById("topArtistChart").innerHTML = ""; // Slot 1
+    document.getElementById("playlist-chart").innerHTML = ""; // Slot 2
+    document.getElementById("listeningTimelineChart").innerHTML = ""; // Slot 3
+    document.getElementById("genreDistributionChart").innerHTML = ""; // Slot 4
+    document.getElementById("popularityBubbleChart").innerHTML = ""; // Slot 5
 
+    if (selectedIndex !== "") {
+        const user = allData[selectedIndex]; // Get the user's data
+
+        // Visualizations
+        await visualizePlaylists(user);               // Slot 2
+        await visualizeMonthlyListening(user);        // Slot 3
+    }
 }
+
+
 
 async function visualizePlaylists(userData){
     const playlistData = userData.playlists.map((playlist, index) => {
@@ -72,6 +79,91 @@ async function visualizePlaylists(userData){
        .attr("width", xScale.bandwidth())
        .attr("height", d => height - margin.bottom - yScale(d.count))
        .attr("fill", "steelblue");
+}
+
+async function visualizeMonthlyListening(userData) {
+    // Clear previous content in the third slot
+    const chartDiv = document.getElementById("listeningTimelineChart");
+    chartDiv.innerHTML = ""; // Clear any existing SVG or content
+
+    // Prepare the data: Group by month and calculate total minutes
+    const musicHistory = userData.streamingHistory.music;
+    const monthlyData = d3.rollups(
+        musicHistory,
+        v => d3.sum(v, d => d.msPlayed) / 60000, // Convert ms to minutes
+        d => new Date(d.endTime).toISOString().slice(0, 7) // Extract YYYY-MM format
+    ).map(([month, minutes]) => ({ month, minutes }));
+
+    // Sort the data by month
+    monthlyData.sort((a, b) => new Date(a.month) - new Date(b.month));
+
+    // Dimensions and margins
+    const width = 500;
+    const height = 300;
+    const margin = { top: 20, right: 20, bottom: 50, left: 60 };
+
+    // Create the SVG
+    const svg = d3.select("#listeningTimelineChart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    // Scales
+    const xScale = d3.scaleTime()
+        .domain(d3.extent(monthlyData, d => new Date(d.month)))
+        .range([margin.left, width - margin.right]);
+
+    const yScale = d3.scaleLinear()
+        .domain([0, d3.max(monthlyData, d => d.minutes)])
+        .nice()
+        .range([height - margin.bottom, margin.top]);
+
+    // Axes
+    svg.append("g")
+        .attr("transform", `translate(0, ${height - margin.bottom})`)
+        .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%b %Y")));
+
+    svg.append("g")
+        .attr("transform", `translate(${margin.left}, 0)`)
+        .call(d3.axisLeft(yScale).ticks(5));
+
+    // Line generator
+    const line = d3.line()
+        .x(d => xScale(new Date(d.month)))
+        .y(d => yScale(d.minutes));
+
+    // Draw the line
+    svg.append("path")
+        .datum(monthlyData)
+        .attr("fill", "none")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 2)
+        .attr("d", line);
+
+    // Add points
+    svg.selectAll(".point")
+        .data(monthlyData)
+        .enter()
+        .append("circle")
+        .attr("class", "point")
+        .attr("cx", d => xScale(new Date(d.month)))
+        .attr("cy", d => yScale(d.minutes))
+        .attr("r", 4)
+        .attr("fill", "orange");
+
+    // Add axis labels
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height - margin.bottom + 40)
+        .attr("text-anchor", "middle")
+        .text("Month");
+
+    svg.append("text")
+        .attr("x", -(height / 2))
+        .attr("y", margin.left - 50)
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .text("Minutes Listening");
 }
 
 
