@@ -172,6 +172,77 @@ async function visualizeMonthlyListening(userData) {
        .attr("fill", "red");
 }
 
+async function visualizeTopSearchQueries(userData) {
+    // Extract the search queries from the user data
+    const searchQueries = userData.SearchQueries;
+
+    // Count the frequency of each search term
+    const searchCount = {};
+
+    searchQueries.forEach(entry => {
+        const term = entry.searchQuery.trim().toLowerCase(); // Normalize the search term
+        if (term) {
+            searchCount[term] = (searchCount[term] || 0) + 1;
+        }
+    });
+
+    // Convert the searchCount object to an array of {term, count} pairs
+    const searchData = Object.entries(searchCount)
+                             .map(([term, count]) => ({ term, count }))
+                             .sort((a, b) => b.count - a.count);  // Sort by count in descending order
+
+    // Get the top 10 most frequent search terms
+    const topSearchData = searchData.slice(0, 10);
+
+    // Set up the dimensions for the bar chart
+    const width = 500;
+    const height = 300;
+    const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+
+    // Create the SVG element for the bar chart
+    const svg = d3.select("#top10Searches")
+                  .append("svg")
+                  .attr("width", width)
+                  .attr("height", height);
+
+    // Set up the x and y scales
+    const xScale = d3.scaleBand()
+                     .domain(topSearchData.map(d => d.term))
+                     .range([margin.left, width - margin.right])
+                     .padding(0.2);
+
+    const yScale = d3.scaleLinear()
+                     .domain([0, d3.max(topSearchData, d => d.count)])
+                     .nice()  // Adjust the range for better fit
+                     .range([height - margin.bottom, margin.top]);
+
+    // Append the x and y axes
+    svg.append("g")
+       .attr("transform", `translate(0, ${height - margin.bottom})`)
+       .call(d3.axisBottom(xScale))
+       .selectAll("text")
+       .attr("transform", "rotate(-45)")
+       .style("text-anchor", "end");  // Rotate x-axis labels for readability
+
+    svg.append("g")
+       .attr("transform", `translate(${margin.left}, 0)`)
+       .call(d3.axisLeft(yScale));
+
+    // Create the bars for the bar chart
+    svg.selectAll(".bar")
+       .data(topSearchData)
+       .enter()
+       .append("rect")
+       .attr("class", "bar")
+       .attr("x", d => xScale(d.term))
+       .attr("y", d => yScale(d.count))
+       .attr("width", xScale.bandwidth())
+       .attr("height", d => height - margin.bottom - yScale(d.count))
+       .attr("fill", "steelblue");
+}
+
+
+
 
 // ----------------- USER SELECTION AND EVENT HANDLING -------------------
 
@@ -197,24 +268,28 @@ async function onUserSelect(event) {
         // Clear and add new visualizations for each chart slot
         document.getElementById("topArtistChart").innerHTML = ""; // Clear the first slot
         document.getElementById("playlist-chart").innerHTML = ""; // Clear the second slot
-        document.getElementById("listeningTimelineChart").innerHTML = ""; // Clear the third slot
-        document.getElementById("top10Searches").innerHTML = ""; // Clear the fourth slot
+        document.getElementById("top10Searches").innerHTML = ""; // Clear the third slot
+        document.getElementById("listeningTimelineChart").innerHTML = ""; // Clear the fourth slot
         document.getElementById("popularityBubbleChart").innerHTML = ""; // Clear the fifth slot
 
         // Add new visualizations
         await visualizePlaylists(user);         // Visualize playlists in the second slot
         await visualizeMonthlyListening(user);  // Visualize listening time in the third slot
+        await visualizeTopSearchQueries(user);
 
         // Optionally add content to the other slots here if needed
         const firstSlot = document.getElementById("topArtistChart");
         firstSlot.innerHTML = "<p>Top artists or something else here...</p>";  // Placeholder or actual content
 
+        // const thirdSlot = document.getElementById("top10Searches");
+        // thirdSlot.innerHTML = "<p>Top 10 searches or something else here...</p>";  // Placeholder or actual content
+
     } else {
-        document.getElementById("playlist-chart").innerHTML = "";
-        document.getElementById("listeningTimelineChart").innerHTML = "";
-        document.getElementById("topArtistChart").innerHTML = "";
-        document.getElementById("top10Searches").innerHTML = "";
-        document.getElementById("popularityBubbleChart").innerHTML = "";
+        document.getElementById("topArtistChart").innerHTML = ""; // Clear the first slot
+        document.getElementById("playlist-chart").innerHTML = ""; // Clear the second slot
+        document.getElementById("top10Searches").innerHTML = ""; // Clear the third slot
+        document.getElementById("listeningTimelineChart").innerHTML = ""; // Clear the fourth slot
+        document.getElementById("popularityBubbleChart").innerHTML = ""; // Clear the fifth slot
     }
 }
 
