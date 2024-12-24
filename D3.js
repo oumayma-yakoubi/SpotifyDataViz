@@ -15,13 +15,19 @@ async function onUserSelect(event) {
     
     const allData = await loadAllUsersData();
     const selectedIndex = event.target.value;
+    
+
+    // const genreData = await loadGenreData("user-1");
 
     if (selectedIndex !== ""){
         const user_data = allData[selectedIndex]; // Obtenir les données de l'utilisateur
+        console.log("---------------------------", user_data.user);
+        
         await visualizePlaylists(user_data);
         await ecoutesChart(user_data);
         await visualizeMonthlyListening(user_data);
         await plotTopArtistsTreemap(user_data);
+        await plotGenrePieChart(user_data.user);
 
         
     }
@@ -31,6 +37,12 @@ async function onUserSelect(event) {
 
 }
 
+
+// **************************
+// ********* Slot 1 *********
+// **************************
+
+// Visualize the playlists
 async function visualizePlaylists(userData){
     const playlistData = userData.playlists.map((playlist, index) => {
         // Assurez-vous que playlist.items est un tableau valide avant d'essayer d'accéder à sa longueur
@@ -90,6 +102,11 @@ document.getElementById("user-select").addEventListener("change", onUserSelect);
 
 
 
+// **************************
+// ********* Slot 2 *********
+// **************************
+
+// Listening time distribution
 async function ecoutesChart(userData){
    // Vérification des données
    if (!userData.streamingHistory || !Array.isArray(userData.streamingHistory.music)) {
@@ -171,6 +188,13 @@ svg.selectAll(".bar")
     .attr("fill", "steelblue");
 }
 
+
+
+
+// **************************
+// ********* Slot 3 *********
+// **************************
+
 // Slot 2: Visualize the total listening time per month (Line chart)
 async function visualizeMonthlyListening(userData) {
     const musicData = userData.streamingHistory.music;
@@ -244,6 +268,11 @@ async function visualizeMonthlyListening(userData) {
        .attr("r", 5)
        .attr("fill", "red");
 }
+
+
+// **************************
+// ********* Slot 4 *********
+// **************************
 
 // Get the top 10 listened artist for each user 
 async function getTopArtists(userData) {
@@ -326,4 +355,88 @@ async function plotTopArtistsTreemap(userFolder) {
     } else {
         console.warn("No artists found for this user.");
     }
+}
+
+
+// **************************
+// ********* Slot 5 *********
+// **************************
+
+// Plot the genre distribution
+
+// Function to aggregate and count genres
+function aggregateGenres(genreData) {
+    const genreCount = {};
+
+    // Iterate through each artist's genres
+    for (const artist in genreData) {
+        const genres = genreData[artist];
+        genres.forEach((genre) => {
+            // Count occurrences of each genre
+            if (genreCount[genre]) {
+                genreCount[genre]++;
+            } else {
+                genreCount[genre] = 1;
+            }
+        });
+    }
+
+    // Convert the genreCount object to an array of [genre, count] pairs
+    const genreArray = Object.keys(genreCount).map((genre) => ({
+        genre: genre,
+        count: genreCount[genre],
+    }));
+
+    // Sort genres by count in descending order
+    genreArray.sort((a, b) => b.count - a.count);
+
+    // Keep only the top 20 genres
+    return genreArray.slice(0, 20);
+}
+
+
+// Function to plot the pie chart 
+function plotGenrePieChart(genreData) {
+    // Step 1: Aggregate genres
+    const topGenres = aggregateGenres(genreData);
+
+    // Step 2: Set up the pie chart
+    const width = 500, height = 500, radius = Math.min(width, height) / 2;
+    const color = d3.scaleOrdinal(d3.schemeCategory10);
+
+    // Create SVG element and append a group for the pie chart
+    const svg = d3.select("#chart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .append("g")
+        .attr("transform", `translate(${width / 2}, ${height / 2})`);
+
+    // Create pie function for calculating the angle of each slice
+    const pie = d3.pie().value((d) => d.count);
+    const arc = d3.arc().outerRadius(radius).innerRadius(0);  // Pie slices
+
+    // Step 3: Bind data to pie chart and create the slices
+    const arcs = svg.selectAll(".arc")
+        .data(pie(topGenres))
+        .enter()
+        .append("g")
+        .attr("class", "arc");
+
+    // Append pie slices
+    arcs.append("path")
+        .attr("d", arc)
+        .style("fill", (d) => color(d.data.genre));
+
+    // Add genre labels
+    arcs.append("text")
+        .attr("transform", (d) => `translate(${arc.centroid(d)})`)
+        .attr("class", "label")
+        .text((d) => d.data.genre);
+
+    // Add percentage labels
+    arcs.append("text")
+        .attr("transform", (d) => `translate(${arc.centroid(d)})`)
+        .attr("class", "percentage")
+        .text((d) => `${Math.round((d.data.count / d3.sum(topGenres, (d) => d.count)) * 100)}%`);
 }
