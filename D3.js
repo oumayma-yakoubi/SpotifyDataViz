@@ -17,17 +17,18 @@ async function onUserSelect(event) {
     const selectedIndex = event.target.value;
     
 
-    // const genreData = await loadGenreData("user-1");
+    
 
     if (selectedIndex !== ""){
         const user_data = allData[selectedIndex]; // Obtenir les données de l'utilisateur
         console.log("---------------------------", user_data.user);
+        const genreData = await loadGenreData(user_data.user);
         
         await visualizePlaylists(user_data);
         await ecoutesChart(user_data);
         await visualizeMonthlyListening(user_data);
         await plotTopArtistsTreemap(user_data);
-        await plotGenrePieChart(user_data.user);
+        await plotGenrePieChart(genreData);
 
         
     }
@@ -370,7 +371,9 @@ function aggregateGenres(genreData) {
 
     // Iterate through each artist's genres
     for (const artist in genreData) {
+
         const genres = genreData[artist];
+        
         genres.forEach((genre) => {
             // Count occurrences of each genre
             if (genreCount[genre]) {
@@ -389,28 +392,32 @@ function aggregateGenres(genreData) {
 
     // Sort genres by count in descending order
     genreArray.sort((a, b) => b.count - a.count);
+    console.log(genreArray.length)
 
-    // Keep only the top 20 genres
-    return genreArray.slice(0, 20);
+    // Keep only the top 10 genres
+    return genreArray.slice(0, 10);
 }
 
-
-// Function to plot the pie chart 
 function plotGenrePieChart(genreData) {
     // Step 1: Aggregate genres
     const topGenres = aggregateGenres(genreData);
 
     // Step 2: Set up the pie chart
-    const width = 500, height = 500, radius = Math.min(width, height) / 2;
-    const color = d3.scaleOrdinal(d3.schemeCategory10);
+    const width = 300, height = 300, radius = Math.min(width, height) / 2;
+    d3.select("#pieChart").selectAll("*").remove();
+
+    // Use a color scale based on the genre names
+    const color = d3.scaleOrdinal()
+        .domain(topGenres.map(d => d.genre))  // Map genre names to the domain
+        .range(d3.schemeSet3);  // You can replace d3.schemeSet3 with any other color palette or define your own
 
     // Create SVG element and append a group for the pie chart
-    const svg = d3.select("#chart")
+    const svg = d3.select("#pieChart")
         .append("svg")
         .attr("width", width)
         .attr("height", height)
         .append("g")
-        .attr("transform", `translate(${width / 2}, ${height / 2})`);
+        .attr("transform", `translate(${width / 2}, ${height / 2})`); // Center the pie chart inside the SVG
 
     // Create pie function for calculating the angle of each slice
     const pie = d3.pie().value((d) => d.count);
@@ -428,15 +435,45 @@ function plotGenrePieChart(genreData) {
         .attr("d", arc)
         .style("fill", (d) => color(d.data.genre));
 
-    // Add genre labels
-    arcs.append("text")
-        .attr("transform", (d) => `translate(${arc.centroid(d)})`)
-        .attr("class", "label")
-        .text((d) => d.data.genre);
-
-    // Add percentage labels
+    // Add percentage labels inside each slice
     arcs.append("text")
         .attr("transform", (d) => `translate(${arc.centroid(d)})`)
         .attr("class", "percentage")
+        .style("text-anchor", "middle")
+        .style("font-size", "12px")
+        .style("font-weight", "bold")
         .text((d) => `${Math.round((d.data.count / d3.sum(topGenres, (d) => d.count)) * 100)}%`);
+
+    // Step 4: Create the legend on the right side of the chart
+    const legendWidth = 12;   // Smaller size for the dots
+    const legendHeight = 12;  // Smaller size for the dots
+    const legendSpacing = 18; // Adjust the vertical spacing between legend items to ensure all 20 fit
+    const legend = svg.append("g")
+        .attr("transform", `translate(${width / 2 + radius + 10}, ${-radius / 2})`); // Position the legend to the right of the pie chart
+
+    // Add legend items (color and genre name)
+    legend.selectAll(".legend")
+        .data(topGenres)
+        .enter()
+        .append("g")
+        .attr("class", "legend")
+        .attr("transform", (d, i) => `translate(0, ${i * legendSpacing})`) // Increase vertical spacing
+
+        // Add colored circles to legend
+        .append("circle")
+        .attr("cx", 0)
+        .attr("cy", legendHeight / 2)  // Position circle vertically centered
+        .attr("r", 6)  // Small dot size
+        .style("fill", (d) => color(d.genre));
+
+    // Add genre text to the legend
+    legend.selectAll(".legendText")
+        .data(topGenres)
+        .enter()
+        .append("text")
+        .attr("x", legendWidth + 5)
+        .attr("y", (d, i) => i * legendSpacing + legendHeight / 2)
+        .attr("dy", ".35em")
+        .text((d) => d.genre)
+        .style("font-size", "12px");
 }
