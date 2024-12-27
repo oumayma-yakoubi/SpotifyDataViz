@@ -52,8 +52,9 @@ async function loadAllUsersData() {
 // Slot 1: Visualize the playlists data
 async function visualizePlaylists(userData){
     const playlistData = userData.playlists.map((playlist, index) => {
+        const name = playlist.name || "Untitled Playlist";
         const itemCount = Array.isArray(playlist.items) ? playlist.items.length : 0;
-        return { name: `Playlist ${index + 1}`, count: itemCount };
+        return { name: name, count: itemCount };
     });
 
     const width = 500;
@@ -79,14 +80,17 @@ async function visualizePlaylists(userData){
                      .call(d3.axisBottom(xScale));
     
     xAxis.selectAll("text")
-         .style("text-anchor", "middle")
-         .attr("transform", "rotate(-45)")
-         .attr("dy", "1.5em")  // Adjust this value as needed
-         .attr("dx");  // Optional: Slightly adjust the horizontal position if necessary
+         .style("text-anchor", "end") // Anchor at the end for vertical alignment
+         .attr("transform", "rotate(-90)") // Rotate by 90 degrees counterclockwise
+         .attr("x", -10) // Adjust horizontal position
+         .attr("y", 0) // Adjust vertical position
+         .attr("dy", "0.35em"); // Fine-tune vertical alignment
                 
     svg.append("g")
        .attr("transform", `translate(${margin.left}, 0)`)
        .call(d3.axisLeft(yScale));
+
+    const tooltip = d3.select("#tooltip");
 
     svg.selectAll(".bar")
        .data(playlistData)
@@ -97,7 +101,19 @@ async function visualizePlaylists(userData){
        .attr("y", d => yScale(d.count))
        .attr("width", xScale.bandwidth())
        .attr("height", d => height - margin.bottom - yScale(d.count))
-       .attr("fill", "steelblue");
+       .attr("fill", "steelblue")
+       .on("mouseover", (event, d) => {
+           tooltip.style("opacity", 1)
+                  .html(`Playlist: ${d.name}<br>Items: ${d.count}`);
+       })
+       .on("mousemove", (event) => {
+           tooltip.style("left", (event.pageX + 10) + "px")
+                  .style("top", (event.pageY - 20) + "px");
+       })
+       .on("mouseout", () => {
+           tooltip.style("opacity", 0);
+       });
+       
 }
 
 // Slot 2: Visualize the total listening time per month (Line chart)
@@ -133,10 +149,10 @@ async function visualizeMonthlyListening(userData) {
                   .attr("width", width)
                   .attr("height", height);
 
-    const xScale = d3.scaleBand()
+    const xScale = d3.scalePoint()
                      .domain(months)
                      .range([margin.left, width - margin.right])
-                     .padding(0.1);
+                     .padding(0.5);
 
     const yScale = d3.scaleLinear()
                      .domain([0, d3.max(minutes)])
@@ -162,6 +178,8 @@ async function visualizeMonthlyListening(userData) {
        .attr("stroke-width", 2)
        .attr("d", line);
 
+    const tooltip = d3.select("#tooltip");
+
     svg.selectAll("circle")
        .data(minutes)
        .enter()
@@ -169,7 +187,18 @@ async function visualizeMonthlyListening(userData) {
        .attr("cx", (d, i) => xScale(months[i]))
        .attr("cy", d => yScale(d))
        .attr("r", 5)
-       .attr("fill", "red");
+       .attr("fill", "red")
+       .on("mouseover", (event, d) => {
+            tooltip.style("opacity", 1)
+                    .html(`Month: ${months[minutes.indexOf(d)]}<br>Minutes: ${d.toFixed(2)}`);
+        })
+        .on("mousemove", (event) => {
+            tooltip.style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.style("opacity", 0);
+        });
 }
 
 async function visualizeTopSearchQueries(userData) {
@@ -191,8 +220,8 @@ async function visualizeTopSearchQueries(userData) {
                              .map(([term, count]) => ({ term, count }))
                              .sort((a, b) => b.count - a.count);  // Sort by count in descending order
 
-    // Get the top 10 most frequent search terms
-    const topSearchData = searchData.slice(0, 10);
+    // Get the top 15 most frequent search terms
+    const topSearchData = searchData.slice(0, 15);
 
     // Set up the dimensions for the bar chart
     const width = 500;
@@ -200,7 +229,7 @@ async function visualizeTopSearchQueries(userData) {
     const margin = { top: 20, right: 20, bottom: 50, left: 50 };
 
     // Create the SVG element for the bar chart
-    const svg = d3.select("#top10Searches")
+    const svg = d3.select("#top15Searches")
                   .append("svg")
                   .attr("width", width)
                   .attr("height", height);
@@ -222,6 +251,7 @@ async function visualizeTopSearchQueries(userData) {
        .call(d3.axisBottom(xScale))
        .selectAll("text")
        .attr("transform", "rotate(-45)")
+       .attr("x", -10) // Adjust horizontal position
        .style("text-anchor", "end");  // Rotate x-axis labels for readability
 
     svg.append("g")
@@ -229,6 +259,8 @@ async function visualizeTopSearchQueries(userData) {
        .call(d3.axisLeft(yScale));
 
     // Create the bars for the bar chart
+    const tooltip = d3.select("#tooltip");
+
     svg.selectAll(".bar")
        .data(topSearchData)
        .enter()
@@ -238,7 +270,18 @@ async function visualizeTopSearchQueries(userData) {
        .attr("y", d => yScale(d.count))
        .attr("width", xScale.bandwidth())
        .attr("height", d => height - margin.bottom - yScale(d.count))
-       .attr("fill", "steelblue");
+       .attr("fill", "steelblue")
+       .on("mouseover", (event, d) => {
+        tooltip.style("opacity", 1)
+               .html(`Search Term: ${d.term}<br>Count: ${d.count}`);
+        })
+        .on("mousemove", (event) => {
+            tooltip.style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.style("opacity", 0);
+        });
 }
 
 
@@ -268,7 +311,7 @@ async function onUserSelect(event) {
         // Clear and add new visualizations for each chart slot
         document.getElementById("topArtistChart").innerHTML = ""; // Clear the first slot
         document.getElementById("playlist-chart").innerHTML = ""; // Clear the second slot
-        document.getElementById("top10Searches").innerHTML = ""; // Clear the third slot
+        document.getElementById("top15Searches").innerHTML = ""; // Clear the third slot
         document.getElementById("listeningTimelineChart").innerHTML = ""; // Clear the fourth slot
         document.getElementById("popularityBubbleChart").innerHTML = ""; // Clear the fifth slot
 
@@ -281,13 +324,10 @@ async function onUserSelect(event) {
         const firstSlot = document.getElementById("topArtistChart");
         firstSlot.innerHTML = "<p>Top artists or something else here...</p>";  // Placeholder or actual content
 
-        // const thirdSlot = document.getElementById("top10Searches");
-        // thirdSlot.innerHTML = "<p>Top 10 searches or something else here...</p>";  // Placeholder or actual content
-
     } else {
         document.getElementById("topArtistChart").innerHTML = ""; // Clear the first slot
         document.getElementById("playlist-chart").innerHTML = ""; // Clear the second slot
-        document.getElementById("top10Searches").innerHTML = ""; // Clear the third slot
+        document.getElementById("top15Searches").innerHTML = ""; // Clear the third slot
         document.getElementById("listeningTimelineChart").innerHTML = ""; // Clear the fourth slot
         document.getElementById("popularityBubbleChart").innerHTML = ""; // Clear the fifth slot
     }
