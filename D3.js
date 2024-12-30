@@ -25,6 +25,7 @@ async function onUserSelect(event) {
         await visualizeMonthlyListening(user_data);
         await plotTopArtistsTreemap(user_data);
         await plotGenrePieChart(genreData);
+        await visualizeTopSearchQueries(user_data);
 
         
     }
@@ -32,7 +33,12 @@ async function onUserSelect(event) {
         document.getElementById("playlist-chart").innerHTML = "";
     }
 
+}
 
+
+populateUserSelect();
+
+document.getElementById("user-select").addEventListener("change", onUserSelect);
 
 // **************************
 // ********* Slot 1 *********
@@ -42,27 +48,23 @@ async function onUserSelect(event) {
 
 async function visualizePlaylists(userData){
     const playlistData = userData.playlists.map((playlist, index) => {
-        // Assurez-vous que playlist.items est un tableau valide avant d'essayer d'accéder à sa longueur
+        const name = playlist.name || "Untitled Playlist";
         const itemCount = Array.isArray(playlist.items) ? playlist.items.length : 0;
-        return {
-            name: `Playlist ${index + 1}`,
-            count: itemCount
-        };
+        return { name: name, count: itemCount };
     });
-    
 
     const width = 500;
     const height = 300; 
     const margin = {top: 20, right: 20, bottom: 50, left: 50};
-    
+
     // Effacer l'ancien contenu de la div
     d3.select("#playlist-chart").selectAll("*").remove();
-        
+
     const svg = d3.select("#playlist-chart")
                   .append("svg")
                   .attr("width", width)
                   .attr("height", height);
-    
+
     const xScale = d3.scaleBand()
                      .domain(playlistData.map(d=>d.name))
                      .range([margin.left, width - margin.right])
@@ -71,14 +73,23 @@ async function visualizePlaylists(userData){
     const yScale = d3.scaleLinear()
                      .domain([0, d3.max(playlistData, d => d.count)])
                      .range([height - margin.bottom, margin.top]);
+
+    const xAxis = svg.append("g")
+                     .attr("transform", `translate(0, ${height - margin.bottom})`)
+                     .call(d3.axisBottom(xScale));
     
-    svg.append("g")
-       .attr("transform", `translate(0, ${height - margin.bottom})`)
-       .call(d3.axisBottom(xScale));
-    
+    xAxis.selectAll("text")
+         .style("text-anchor", "end") // Anchor at the end for vertical alignment
+         .attr("transform", "rotate(-90)") // Rotate by 90 degrees counterclockwise
+         .attr("x", -10) // Adjust horizontal position
+         .attr("y", 0) // Adjust vertical position
+         .attr("dy", "0.35em"); // Fine-tune vertical alignment
+                
     svg.append("g")
        .attr("transform", `translate(${margin.left}, 0)`)
        .call(d3.axisLeft(yScale));
+
+    const tooltip = d3.select("#tooltip");
 
     svg.selectAll(".bar")
        .data(playlistData)
@@ -89,195 +100,211 @@ async function visualizePlaylists(userData){
        .attr("y", d => yScale(d.count))
        .attr("width", xScale.bandwidth())
        .attr("height", d => height - margin.bottom - yScale(d.count))
-       .attr("fill", "steelblue");
+       .attr("fill", "steelblue")
+       .on("mouseover", (event, d) => {
+           tooltip.style("opacity", 1)
+                  .html(`Playlist: ${d.name}<br>Items: ${d.count}`);
+       })
+       .on("mousemove", (event) => {
+           tooltip.style("left", (event.pageX + 10) + "px")
+                  .style("top", (event.pageY - 20) + "px");
+       })
+       .on("mouseout", () => {
+           tooltip.style("opacity", 0);
+       });
+       
 }
-
-async function visualizeMonthlyListening(userData) {
-    // Clear previous content in the third slot
-    const chartDiv = document.getElementById("listeningTimelineChart");
-    chartDiv.innerHTML = ""; // Clear any existing SVG or content
-
-    // Prepare the data: Group by month and calculate total minutes
-    const musicHistory = userData.streamingHistory.music;
-    const monthlyData = d3.rollups(
-        musicHistory,
-        v => d3.sum(v, d => d.msPlayed) / 60000, // Convert ms to minutes
-        d => new Date(d.endTime).toISOString().slice(0, 7) // Extract YYYY-MM format
-    ).map(([month, minutes]) => ({ month, minutes }));
-
-    // Sort the data by month
-    monthlyData.sort((a, b) => new Date(a.month) - new Date(b.month));
-
-    // Dimensions and margins
-    const width = 500;
-    const height = 300;
-    const margin = { top: 20, right: 20, bottom: 50, left: 60 };
-
-    // Create the SVG
-    const svg = d3.select("#listeningTimelineChart")
-        .append("svg")
-        .attr("width", width)
-        .attr("height", height);
-
-    // Scales
-    const xScale = d3.scaleTime()
-        .domain(d3.extent(monthlyData, d => new Date(d.month)))
-        .range([margin.left, width - margin.right]);
-
-    const yScale = d3.scaleLinear()
-        .domain([0, d3.max(monthlyData, d => d.minutes)])
-        .nice()
-        .range([height - margin.bottom, margin.top]);
-
-    // Axes
-    svg.append("g")
-        .attr("transform", `translate(0, ${height - margin.bottom})`)
-        .call(d3.axisBottom(xScale).tickFormat(d3.timeFormat("%b %Y")));
-
-    svg.append("g")
-        .attr("transform", `translate(${margin.left}, 0)`)
-        .call(d3.axisLeft(yScale).ticks(5));
-
-    // Line generator
-    const line = d3.line()
-        .x(d => xScale(new Date(d.month)))
-        .y(d => yScale(d.minutes));
-
-    // Draw the line
-    svg.append("path")
-        .datum(monthlyData)
-        .attr("fill", "none")
-        .attr("stroke", "steelblue")
-        .attr("stroke-width", 2)
-        .attr("d", line);
-
-    // Add points
-    svg.selectAll(".point")
-        .data(monthlyData)
-        .enter()
-        .append("circle")
-        .attr("class", "point")
-        .attr("cx", d => xScale(new Date(d.month)))
-        .attr("cy", d => yScale(d.minutes))
-        .attr("r", 4)
-        .attr("fill", "orange");
-
-    // Add axis labels
-    svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", height - margin.bottom + 40)
-        .attr("text-anchor", "middle")
-        .text("Month");
-
-    svg.append("text")
-        .attr("x", -(height / 2))
-        .attr("y", margin.left - 50)
-        .attr("text-anchor", "middle")
-        .attr("transform", "rotate(-90)")
-        .text("Minutes Listening");
-}
-
-
-populateUserSelect();
-
-document.getElementById("user-select").addEventListener("change", onUserSelect);
-
-
 
 // **************************
 // ********* Slot 2 *********
 // **************************
 
-// Listening time distribution
-async function ecoutesChart(userData){
-   // Vérification des données
-   if (!userData.streamingHistory || !Array.isArray(userData.streamingHistory.music)) {
-    console.error("streamingHistory ou music est manquant pour cet utilisateur.");
-    return;
-}
+// Top serach queries history
 
-// Définir les périodes
-const periodes = [
-    { start: 0, end: 6, label: "Minuit - 6h" },
-    { start: 6, end: 9, label: "6h - 9h" },
-    { start: 9, end: 12, label: "9h - 12h" },
-    { start: 12, end: 18, label: "12h - 18h" },
-    { start: 18, end: 24, label: "18h - Minuit" }
-];
+async function visualizeTopSearchQueries(userData) {
+  
+    // Extract the search queries from the user data
+    const searchQueries = userData.SearchQueries;
 
-// Calcul des moyennes d'écoute
-const getHour = (dateString) => {
-    const [date, time] = dateString.split(' ');
-    const [hour] = time.split(':');
-    return parseInt(hour, 10);
-};
+    // Count the frequency of each search term
+    const searchCount = {};
 
-const moyennesEcoute = periodes.map(period => {
-    const ecoutes = userData.streamingHistory.music.filter(entry => {
-        const heure = getHour(entry.endTime);
-        return heure >= period.start && heure < period.end;
+    searchQueries.forEach(entry => {
+        const term = entry.searchQuery.trim().toLowerCase(); // Normalize the search term
+        if (term) {
+            searchCount[term] = (searchCount[term] || 0) + 1;
+        }
     });
 
-    const totalMs = ecoutes.reduce((sum, entry) => sum + entry.msPlayed, 0);
-    return ecoutes.length ? (totalMs / ecoutes.length) / 1000 : 0; // Moyenne en secondes
-});
+    // Convert the searchCount object to an array of {term, count} pairs
+    const searchData = Object.entries(searchCount)
+                             .map(([term, count]) => ({ term, count }))
+                             .sort((a, b) => b.count - a.count);  // Sort by count in descending order
 
-// Dimensions du graphique
-const width = 500;
-const height = 300;
-const margin = { top: 20, right: 20, bottom: 50, left: 50 }; 
+    // Get the top 15 most frequent search terms
+    const topSearchData = searchData.slice(0, 15);
 
-// Effacer l'ancien contenu de la div
-d3.select("#ecoutesChart").selectAll("*").remove();
+    // Set up the dimensions for the bar chart
+    const width = 500;
+    const height = 300;
+    const margin = { top: 20, right: 20, bottom: 50, left: 50 };
 
-// Créer le conteneur SVG dans le <div>
-const svg = d3.select("#ecoutesChart")
-    .append("svg")
-    .attr("width", width)
-    .attr("height", height);
+    // Effacer l'ancien contenu de la div
+    d3.select("#top15Searches").selectAll("*").remove();
 
-// Echelle des axes
-const x = d3.scaleBand()
-    .domain(periodes.map(p => p.label))
-    .range([margin.left, width - margin.right])
-    .padding(0.2);
+    // Create the SVG element for the bar chart
+    const svg = d3.select("#top15Searches")
+                  .append("svg")
+                  .attr("width", width)
+                  .attr("height", height);
 
-const y = d3.scaleLinear()
-    .domain([0, d3.max(moyennesEcoute)]) // Empêche une échelle vide
-    .nice()
-    .range([height - margin.bottom, margin.top]);
+    // Set up the x and y scales
+    const xScale = d3.scaleBand()
+                     .domain(topSearchData.map(d => d.term))
+                     .range([margin.left, width - margin.right])
+                     .padding(0.2);
 
-// Ajouter l'axe X
-svg.append("g")
-    .attr("transform", `translate(0,${height - margin.bottom})`)
-    .call(d3.axisBottom(x))
+    const yScale = d3.scaleLinear()
+                     .domain([0, d3.max(topSearchData, d => d.count)])
+                     .nice()  // Adjust the range for better fit
+                     .range([height - margin.bottom, margin.top]);
 
-// Ajouter l'axe Y
-svg.append("g")
-    .attr("transform", `translate(${margin.left},0)`)
-    .call(d3.axisLeft(y));
-    
-// Ajouter les barres
-svg.selectAll(".bar")
-    .data(moyennesEcoute)
-    .enter()
-    .append("rect")
-    .attr("class", "bar")
-    .attr("x", (_, i) => x(periodes[i].label))
-    .attr("y", d => y(d))
-    .attr("width", x.bandwidth())
-    .attr("height", d => height - margin.bottom - y(d))
-    .attr("fill", "steelblue");
+    // Append the x and y axes
+    svg.append("g")
+       .attr("transform", `translate(0, ${height - margin.bottom})`)
+       .call(d3.axisBottom(xScale))
+       .selectAll("text")
+       .attr("transform", "rotate(-45)")
+       .attr("x", -10) // Adjust horizontal position
+       .style("text-anchor", "end");  // Rotate x-axis labels for readability
+
+    svg.append("g")
+       .attr("transform", `translate(${margin.left}, 0)`)
+       .call(d3.axisLeft(yScale));
+
+    // Create the bars for the bar chart
+    const tooltip = d3.select("#tooltip");
+
+    svg.selectAll(".bar")
+       .data(topSearchData)
+       .enter()
+       .append("rect")
+       .attr("class", "bar")
+       .attr("x", d => xScale(d.term))
+       .attr("y", d => yScale(d.count))
+       .attr("width", xScale.bandwidth())
+       .attr("height", d => height - margin.bottom - yScale(d.count))
+       .attr("fill", "steelblue")
+       .on("mouseover", (event, d) => {
+        tooltip.style("opacity", 1)
+               .html(`Search Term: ${d.term}<br>Count: ${d.count}`);
+        })
+        .on("mousemove", (event) => {
+            tooltip.style("left", (event.pageX + 10) + "px")
+                .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.style("opacity", 0);
+        });
 }
-
-
 
 
 // **************************
 // ********* Slot 3 *********
 // **************************
 
-// Slot 2: Visualize the total listening time per month (Line chart)
+// Listening time distribution
+
+async function ecoutesChart(userData){
+   // Vérification des données
+   if (!userData.streamingHistory || !Array.isArray(userData.streamingHistory.music)) {
+    console.error("streamingHistory ou music est manquant pour cet utilisateur.");
+    return;
+    }
+
+    // Définir les périodes
+    const periodes = [
+        { start: 0, end: 6, label: "Minuit - 6h" },
+        { start: 6, end: 9, label: "6h - 9h" },
+        { start: 9, end: 12, label: "9h - 12h" },
+        { start: 12, end: 18, label: "12h - 18h" },
+        { start: 18, end: 24, label: "18h - Minuit" }
+    ];
+
+    // Calcul des moyennes d'écoute
+    const getHour = (dateString) => {
+        const [date, time] = dateString.split(' ');
+        const [hour] = time.split(':');
+        return parseInt(hour, 10);
+    };
+
+    const moyennesEcoute = periodes.map(period => {
+        const ecoutes = userData.streamingHistory.music.filter(entry => {
+            const heure = getHour(entry.endTime);
+            return heure >= period.start && heure < period.end;
+        });
+
+        const totalMs = ecoutes.reduce((sum, entry) => sum + entry.msPlayed, 0);
+        return ecoutes.length ? (totalMs / ecoutes.length) / 1000 : 0; // Moyenne en secondes
+    });
+
+    // Dimensions du graphique
+    const width = 500;
+    const height = 300;
+    const margin = { top: 20, right: 20, bottom: 50, left: 50 }; 
+
+    // Effacer l'ancien contenu de la div
+    d3.select("#ecoutesChart").selectAll("*").remove();
+
+    // Créer le conteneur SVG dans le <div>
+    const svg = d3.select("#ecoutesChart")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    // Echelle des axes
+    const x = d3.scaleBand()
+        .domain(periodes.map(p => p.label))
+        .range([margin.left, width - margin.right])
+        .padding(0.2);
+
+    const y = d3.scaleLinear()
+        .domain([0, d3.max(moyennesEcoute)]) // Empêche une échelle vide
+        .nice()
+        .range([height - margin.bottom, margin.top]);
+
+    // Ajouter l'axe X
+    svg.append("g")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x))
+
+    // Ajouter l'axe Y
+    svg.append("g")
+        .attr("transform", `translate(${margin.left},0)`)
+        .call(d3.axisLeft(y));
+        
+    // Ajouter les barres
+    svg.selectAll(".bar")
+        .data(moyennesEcoute)
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("x", (_, i) => x(periodes[i].label))
+        .attr("y", d => y(d))
+        .attr("width", x.bandwidth())
+        .attr("height", d => height - margin.bottom - y(d))
+        .attr("fill", "steelblue");
+}
+
+
+
+
+// **************************
+// ********* Slot 4 *********
+// **************************
+
+// Visualize the total listening time per month (Line chart)
+
 async function visualizeMonthlyListening(userData) {
     const musicData = userData.streamingHistory.music;
     if (!musicData || musicData.length === 0) {
@@ -304,6 +331,7 @@ async function visualizeMonthlyListening(userData) {
     const width = 500;
     const height = 300;
     const margin = {top: 20, right: 20, bottom: 50, left: 50};
+
     // Effacer l'ancien contenu de la div
     d3.select("#listeningTimelineChart").selectAll("*").remove();
 
@@ -312,10 +340,10 @@ async function visualizeMonthlyListening(userData) {
                   .attr("width", width)
                   .attr("height", height);
 
-    const xScale = d3.scaleBand()
+    const xScale = d3.scalePoint()
                      .domain(months)
                      .range([margin.left, width - margin.right])
-                     .padding(0.1);
+                     .padding(0.5);
 
     const yScale = d3.scaleLinear()
                      .domain([0, d3.max(minutes)])
@@ -341,6 +369,8 @@ async function visualizeMonthlyListening(userData) {
        .attr("stroke-width", 2)
        .attr("d", line);
 
+    const tooltip = d3.select("#tooltip");
+
     svg.selectAll("circle")
        .data(minutes)
        .enter()
@@ -348,13 +378,26 @@ async function visualizeMonthlyListening(userData) {
        .attr("cx", (d, i) => xScale(months[i]))
        .attr("cy", d => yScale(d))
        .attr("r", 5)
-       .attr("fill", "red");
+       .attr("fill", "red")
+       .on("mouseover", (event, d) => {
+            tooltip.style("opacity", 1)
+                    .html(`Month: ${months[minutes.indexOf(d)]}<br>Minutes: ${d.toFixed(2)}`);
+        })
+        .on("mousemove", (event) => {
+            tooltip.style("left", (event.pageX + 10) + "px")
+                    .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseout", () => {
+            tooltip.style("opacity", 0);
+        });
 }
 
 
 // **************************
-// ********* Slot 4 *********
+// ********* Slot 5 *********
 // **************************
+
+// Top 10 artist treemap
 
 // Get the top 10 listened artist for each user 
 async function getTopArtists(userData) {
@@ -376,7 +419,7 @@ async function getTopArtists(userData) {
 }
 
 
-// Draw the tp 10 artist treemap 
+// Draw the top 10 artist treemap 
 function drawTreemap(artistData) {
     const width = 500;
     const height = 300;
@@ -430,6 +473,7 @@ function drawTreemap(artistData) {
         });
 }
 
+// Plot the treemap
 async function plotTopArtistsTreemap(userFolder) {
     const topArtists = await getTopArtists(userFolder);
     if (topArtists.length > 0) {
@@ -441,7 +485,7 @@ async function plotTopArtistsTreemap(userFolder) {
 
 
 // **************************
-// ********* Slot 5 *********
+// ********* Slot 6 *********
 // **************************
 
 // Plot the genre distribution
