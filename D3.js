@@ -26,6 +26,7 @@ async function onUserSelect(event) {
         await plotTopArtistsTreemap(user_data);
         await plotGenrePieChart(genreData);
         await visualizeTopSearchQueries(user_data);
+        await plotPodcastMusicChart(user_data);
 
         
     }
@@ -601,4 +602,169 @@ function plotGenrePieChart(genreData) {
         .attr("dy", ".35em")
         .text((d) => d.genre)
         .style("font-size", "12px");
+}
+
+
+// **************************
+// ********* Slot 7 *********
+// **************************
+
+// Comparaison between padcast and music listening habits
+
+// Helper function to convert timestamp to year-month format
+function formatToYearMonth(dateString) {
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1; // Month is zero-indexed
+    return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+// Function to aggregate streaming time per month
+function aggregateStreamingData(streamingData) {
+    const monthlyData = {};
+
+    streamingData.forEach(entry => {
+        if (entry.msPlayed > 0) { // Only consider entries with valid playtime
+            const yearMonth = formatToYearMonth(entry.endTime);
+            monthlyData[yearMonth] = (monthlyData[yearMonth] || 0) + entry.msPlayed;
+        }
+    });
+
+    // Convert to array for easier charting
+    return Object.entries(monthlyData).map(([month, msPlayed]) => ({
+        month,
+        hoursPlayed: msPlayed / (1000 * 60 * 60), // Convert ms to hours
+    }));
+}
+
+// Function to prepare data for visualization
+function prepareComparisonData(userData) {
+    const musicData = aggregateStreamingData(userData.streamingHistory.music);
+    const podcastData = aggregateStreamingData(userData.streamingHistory.podcast);
+
+    console.log("Music Monthly Data:", musicData);
+    console.log("Podcast Monthly Data:", podcastData);
+
+    // Create a unified dataset for visualization
+    const allMonths = new Set([...musicData.map(d => d.month), ...podcastData.map(d => d.month)]);
+    const comparisonData = [];
+
+    allMonths.forEach(month => {
+        const music = musicData.find(d => d.month === month);
+        const podcast = podcastData.find(d => d.month === month);
+
+        console.log("Music mapping:", music);
+        console.log("Podcast mapping:", podcast);
+
+        comparisonData.push({
+            month,
+            musicHours: music ? music.hoursPlayed : 0,
+            podcastHours: podcast ? podcast.hoursPlayed : 0,
+        });
+    });
+
+
+    // Sort by month
+    return comparisonData.sort((a, b) => new Date(a.month) - new Date(b.month));
+}
+
+
+function plotPodcastMusicChart(allUsersData) {
+    const comparisonData = prepareComparisonData(allUsersData);
+
+    console.log("Comparison data: ", comparisonData);
+
+    const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+    const width = 400;
+    const height = 200;
+
+    // Remove any existing chart
+    d3.select("#podcastMusicChart").selectAll("*").remove();
+
+    // Create the SVG container
+    const svg = d3.select("#podcastMusicChart")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    
+
+    // Set up scales
+    const xScale = d3.scaleBand()
+        .domain(comparisonData.map(d => d.month))
+        .range([0, width])
+        .padding(0.2);
+
+    const yScale = d3.scaleLinear()
+        .domain([0, d3.max(comparisonData, d => Math.max(d.musicHours, d.podcastHours))])
+        .range([height, 0]);
+
+    // Draw axes
+    svg.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(xScale))
+        .selectAll("text")
+        .attr("transform", "rotate(-45)")
+        .style("text-anchor", "end");
+
+    svg.append("g")
+        .call(d3.axisLeft(yScale).ticks(10));
+
+    // Draw music bars
+    svg.selectAll(".bar.music")
+        .data(comparisonData)
+        .enter()
+        .append("rect")
+        .attr("class", "bar music")
+        .attr("x", d => xScale(d.month))
+        .attr("y", d => yScale(d.musicHours))
+        .attr("width", xScale.bandwidth() / 2)
+        .attr("height", d => height - yScale(d.musicHours))
+        .attr("fill", "#1DB954"); // Spotify green for music
+
+    // Draw podcast bars
+    svg.selectAll(".bar.podcast")
+        .data(comparisonData)
+        .enter()
+        .append("rect")
+        .attr("class", "bar podcast")
+        .attr("x", d => xScale(d.month) + xScale.bandwidth() / 2)
+        .attr("y", d => yScale(d.podcastHours))
+        .attr("width", xScale.bandwidth() / 2)
+        .attr("height", d => height - yScale(d.podcastHours))
+        .attr("fill", "#FFC107"); // Yellow for podcasts
+
+    // Add legend
+    const legend = svg.append("g")
+        .attr("transform", `translate(${width - 100}, ${-10})`);
+
+    legend.append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", 20)
+        .attr("height", 20)
+        .attr("fill", "#1DB954");
+
+    legend.append("text")
+        .attr("x", 30)
+        .attr("y", 15)
+        .text("Music")
+        .style("font-size", "14px")
+        .attr("alignment-baseline", "middle");
+
+    legend.append("rect")
+        .attr("x", 0)
+        .attr("y", 30)
+        .attr("width", 20)
+        .attr("height", 20)
+        .attr("fill", "#FFC107");
+
+    legend.append("text")
+        .attr("x", 30)
+        .attr("y", 45)
+        .text("Podcasts")
+        .style("font-size", "14px")
+        .attr("alignment-baseline", "middle");
 }
