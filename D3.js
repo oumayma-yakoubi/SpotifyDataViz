@@ -20,20 +20,23 @@ async function onUserSelect(event) {
         console.log("---------------------------", user_data.user);
         const genreData = await loadGenreData(user_data.user);
         
+        // Call visualizations
         await visualizePlaylists(user_data);
         await ecoutesChart(user_data);
-        await visualizeMonthlyListening(user_data);
+        
+        // Pass a callback to visualizeMonthlyListening to link both ecoutesChart and plotTopArtistsTreemap
+        await visualizeMonthlyListening(user_data, (selectedMonth) => {
+            ecoutesChart(user_data, selectedMonth);
+            plotTopArtistsTreemap(user_data, selectedMonth);
+        });
+
         await plotTopArtistsTreemap(user_data);
         await plotGenrePieChart(genreData);
         await visualizeTopSearchQueries(user_data);
         await plotPodcastMusicChart(user_data);
-
-        
-    }
-    else{
+    } else {
         document.getElementById("playlist-chart").innerHTML = "";
     }
-
 }
 
 
@@ -216,23 +219,28 @@ async function visualizeTopSearchQueries(userData) {
 
 // Listening time distribution
 
-async function ecoutesChart(userData){
-   // Vérification des données
-   if (!userData.streamingHistory || !Array.isArray(userData.streamingHistory.music)) {
-    console.error("streamingHistory ou music est manquant pour cet utilisateur.");
-    return;
+async function ecoutesChart(userData, month = null) {
+    if (!userData.streamingHistory || !Array.isArray(userData.streamingHistory.music)) {
+        console.error("streamingHistory or music is missing for this user.");
+        return;
     }
 
-    // Définir les périodes
+    const filteredData = month
+        ? userData.streamingHistory.music.filter(entry => {
+            const entryDate = new Date(entry.endTime);
+            const entryMonth = entryDate.toLocaleString('default', { month: 'short' });
+            return entryMonth === month;
+        })
+        : userData.streamingHistory.music;
+
     const periodes = [
-        { start: 0, end: 6, label: "Minuit - 6h" },
-        { start: 6, end: 9, label: "6h - 9h" },
-        { start: 9, end: 12, label: "9h - 12h" },
-        { start: 12, end: 18, label: "12h - 18h" },
-        { start: 18, end: 24, label: "18h - Minuit" }
+        { start: 0, end: 6, label: "Midnight - 6 AM" },
+        { start: 6, end: 9, label: "6 AM - 9 AM" },
+        { start: 9, end: 12, label: "9 AM - 12 PM" },
+        { start: 12, end: 18, label: "12 PM - 6 PM" },
+        { start: 18, end: 24, label: "6 PM - Midnight" }
     ];
 
-    // Calcul des moyennes d'écoute
     const getHour = (dateString) => {
         const [date, time] = dateString.split(' ');
         const [hour] = time.split(':');
@@ -240,51 +248,44 @@ async function ecoutesChart(userData){
     };
 
     const moyennesEcoute = periodes.map(period => {
-        const ecoutes = userData.streamingHistory.music.filter(entry => {
+        const ecoutes = filteredData.filter(entry => {
             const heure = getHour(entry.endTime);
             return heure >= period.start && heure < period.end;
         });
 
         const totalMs = ecoutes.reduce((sum, entry) => sum + entry.msPlayed, 0);
-        return ecoutes.length ? (totalMs / ecoutes.length) / 1000 : 0; // Moyenne en secondes
+        return ecoutes.length ? (totalMs / ecoutes.length) / 1000 : 0;
     });
 
-    // Dimensions du graphique
     const width = 500;
     const height = 300;
-    const margin = { top: 20, right: 20, bottom: 50, left: 50 }; 
+    const margin = { top: 20, right: 20, bottom: 50, left: 50 };
 
-    // Effacer l'ancien contenu de la div
     d3.select("#ecoutesChart").selectAll("*").remove();
 
-    // Créer le conteneur SVG dans le <div>
     const svg = d3.select("#ecoutesChart")
         .append("svg")
         .attr("width", width)
         .attr("height", height);
 
-    // Echelle des axes
     const x = d3.scaleBand()
         .domain(periodes.map(p => p.label))
         .range([margin.left, width - margin.right])
         .padding(0.2);
 
     const y = d3.scaleLinear()
-        .domain([0, d3.max(moyennesEcoute)]) // Empêche une échelle vide
+        .domain([0, d3.max(moyennesEcoute)])
         .nice()
         .range([height - margin.bottom, margin.top]);
 
-    // Ajouter l'axe X
     svg.append("g")
         .attr("transform", `translate(0,${height - margin.bottom})`)
-        .call(d3.axisBottom(x))
+        .call(d3.axisBottom(x));
 
-    // Ajouter l'axe Y
     svg.append("g")
         .attr("transform", `translate(${margin.left},0)`)
         .call(d3.axisLeft(y));
-        
-    // Ajouter les barres
+
     svg.selectAll(".bar")
         .data(moyennesEcoute)
         .enter()
@@ -298,15 +299,13 @@ async function ecoutesChart(userData){
 }
 
 
-
-
 // **************************
 // ********* Slot 4 *********
 // **************************
 
 // Visualize the total listening time per month (Line chart)
 
-async function visualizeMonthlyListening(userData) {
+async function visualizeMonthlyListening(userData, updateTimeDistribution) {
     const musicData = userData.streamingHistory.music;
     if (!musicData || musicData.length === 0) {
         console.error("No music data available for visualization.");
@@ -316,8 +315,8 @@ async function visualizeMonthlyListening(userData) {
     const monthlyMinutes = {};
     musicData.forEach(record => {
         const date = new Date(record.endTime);
-        const month = date.toLocaleString('default', { month: 'short'});
-        const minutes = record.msPlayed / 60000;  // Convert ms to minutes
+        const month = date.toLocaleString('default', { month: 'short' });
+        const minutes = record.msPlayed / 60000;
 
         if (monthlyMinutes[month]) {
             monthlyMinutes[month] += minutes;
@@ -331,65 +330,72 @@ async function visualizeMonthlyListening(userData) {
 
     const width = 500;
     const height = 300;
-    const margin = {top: 20, right: 20, bottom: 50, left: 50};
+    const margin = { top: 20, right: 20, bottom: 50, left: 50 };
 
-    // Effacer l'ancien contenu de la div
     d3.select("#listeningTimelineChart").selectAll("*").remove();
 
     const svg = d3.select("#listeningTimelineChart")
-                  .append("svg")
-                  .attr("width", width)
-                  .attr("height", height);
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
 
     const xScale = d3.scalePoint()
-                     .domain(months)
-                     .range([margin.left, width - margin.right])
-                     .padding(0.5);
+        .domain(months)
+        .range([margin.left, width - margin.right])
+        .padding(0.5);
 
     const yScale = d3.scaleLinear()
-                     .domain([0, d3.max(minutes)])
-                     .nice()
-                     .range([height - margin.bottom, margin.top]);
+        .domain([0, d3.max(minutes)])
+        .nice()
+        .range([height - margin.bottom, margin.top]);
 
     svg.append("g")
-       .attr("transform", `translate(0, ${height - margin.bottom})`)
-       .call(d3.axisBottom(xScale));
+        .attr("transform", `translate(0, ${height - margin.bottom})`)
+        .call(d3.axisBottom(xScale));
 
     svg.append("g")
-       .attr("transform", `translate(${margin.left}, 0)`)
-       .call(d3.axisLeft(yScale));
+        .attr("transform", `translate(${margin.left}, 0)`)
+        .call(d3.axisLeft(yScale));
 
     const line = d3.line()
-                   .x((d, i) => xScale(months[i]))
-                   .y(d => yScale(d));
+        .x((d, i) => xScale(months[i]))
+        .y(d => yScale(d));
 
     svg.append("path")
-       .data([minutes])
-       .attr("fill", "none")
-       .attr("stroke", "steelblue")
-       .attr("stroke-width", 2)
-       .attr("d", line);
+        .data([minutes])
+        .attr("fill", "none")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 2)
+        .attr("d", line);
 
     const tooltip = d3.select("#tooltip");
 
     svg.selectAll("circle")
-       .data(minutes)
-       .enter()
-       .append("circle")
-       .attr("cx", (d, i) => xScale(months[i]))
-       .attr("cy", d => yScale(d))
-       .attr("r", 5)
-       .attr("fill", "red")
-       .on("mouseover", (event, d) => {
+        .data(minutes)
+        .enter()
+        .append("circle")
+        .attr("cx", (d, i) => xScale(months[i]))
+        .attr("cy", d => yScale(d))
+        .attr("r", 5)
+        .attr("fill", "red")
+        .on("mouseover", (event, d) => {
             tooltip.style("opacity", 1)
-                    .html(`Month: ${months[minutes.indexOf(d)]}<br>Minutes: ${d.toFixed(2)}`);
+                .html(`Month: ${months[minutes.indexOf(d)]}<br>Minutes: ${d.toFixed(2)}`);
         })
         .on("mousemove", (event) => {
             tooltip.style("left", (event.pageX + 10) + "px")
-                    .style("top", (event.pageY - 20) + "px");
+                .style("top", (event.pageY - 20) + "px");
         })
         .on("mouseout", () => {
             tooltip.style("opacity", 0);
+        })
+        .on("click", (event, d) => {
+            const selectedMonth = months[minutes.indexOf(d)];
+            updateTimeDistribution(selectedMonth);
+            svg.selectAll("circle")
+                .attr("fill", "lightgray");
+            d3.select(event.currentTarget)
+                .attr("fill", "red");
         });
 }
 
@@ -398,17 +404,24 @@ async function visualizeMonthlyListening(userData) {
 // ********* Slot 5 *********
 // **************************
 
-// Top 10 artist treemap
+// Top 8 artist treemap
 
-// Get the top 10 listened artist for each user 
-async function getTopArtists(userData) {
-    
+// Get the top 8 listened artist for each user 
+async function getTopArtists(userData, selectedMonth = null) {
     if (!userData || !userData.YourLibrary?.tracks) {
-        console.warn(`No library data found for user ${userFolder}`);
+        console.warn("No library data found.");
         return [];
     }
 
-    const trackCounts = userData.YourLibrary.tracks.reduce((acc, track) => {
+    // Filter tracks by month if a month is selected
+    const filteredTracks = selectedMonth
+        ? userData.YourLibrary.tracks.filter(track => {
+            const month = new Date(track.endTime).toLocaleString('default', { month: 'short' });
+            return month === selectedMonth;
+        })
+        : userData.YourLibrary.tracks;
+
+    const trackCounts = filteredTracks.reduce((acc, track) => {
         acc[track.artist] = (acc[track.artist] || 0) + 1;
         return acc;
     }, {});
@@ -420,7 +433,7 @@ async function getTopArtists(userData) {
 }
 
 
-// Draw the top 10 artist treemap 
+// Draw the top 8 artist treemap 
 function drawTreemap(artistData) {
     const width = 500;
     const height = 300;
@@ -475,8 +488,8 @@ function drawTreemap(artistData) {
 }
 
 // Plot the treemap
-async function plotTopArtistsTreemap(userFolder) {
-    const topArtists = await getTopArtists(userFolder);
+async function plotTopArtistsTreemap(userData, selectedMonth = null) {
+    const topArtists = await getTopArtists(userData, selectedMonth);
     if (topArtists.length > 0) {
         drawTreemap(topArtists);
     } else {
